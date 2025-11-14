@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nbm-verification"
+version = "0.1.0"
+description = "Verification framework for NBM 5.0 weather model performance analysis"
+readme = "README.md"
+authors = [
+    {name = "Mike Wessler", email = "67126989+m-wessler@users.noreply.github.com"}
+]
+license = {text = "TBD"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "xarray>=2023.1.0",
+    "cfgrib>=0.9.10",
+    "boto3>=1.26.0",
+    "s3fs>=2023.1.0",
+    "requests>=2.28.0",
+    "geopandas>=0.12.0",
+    "metpy>=1.4.0",
+    "scikit-learn>=1.2.0",
+    "scoringrules>=0.5.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "cartopy>=0.21.0",
+    "pyyaml>=6.0",
+    "pyproj>=3.4.0",
+    "scipy>=1.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.2.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.1.0",
+    "flake8>=6.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "ipython>=8.10.0",
+]
+notebook = [
+    "jupyter>=1.0.0",
+    "jupyterlab>=3.6.0",
+    "ipykernel>=6.21.0",
+    "ipywidgets>=8.0.0",
+]
+export = [
+    "pyarrow>=11.0.0",
+    "fastparquet>=2023.1.0",
+    "h5py>=3.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/m-wessler/nbm-v5-verification"
+Repository = "https://github.com/m-wessler/nbm-v5-verification"
+Documentation = "https://github.com/m-wessler/nbm-v5-verification/tree/main/docs"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=nbm_verification --cov-report=term-missing"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
