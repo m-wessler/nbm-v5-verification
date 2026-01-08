@@ -87,6 +87,7 @@ ehthumbs.db
 Desktop.ini
 
 # Data directories (excluded from version control)
+dev/
 data/
 outputs/
 
