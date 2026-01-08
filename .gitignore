@@ -100,3 +100,6 @@ config/*.yml
 *.tmp
 *.bak
 *.log
+
+# Ignore all CSV files
+*.csv
