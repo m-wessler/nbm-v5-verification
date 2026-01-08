@@ -31,38 +31,8 @@ nbm-v5-verification/
 └── README.md               # Project documentation
 ```
 
-## Installation
-
-### Conda Environment
-
-```bash
-# Create conda environment
-conda env create -f env.yaml
-conda activate nbmv5
-```
-
-## Quick Start
-
-### 1. Process GRIB Files
-
-Use the `detailed_grib_catalog.py` script to catalog GRIB files:
-
-```bash
-python detailed_grib_catalog.py
-```
-
-### 2. Analyze Data
-
-Run Jupyter notebooks in the `dev/` directory for interactive analysis:
-
-```bash
-jupyter lab
-```
-
 ## Contributing
 
 This is an internal project. For questions or issues, please contact the project team.
-
----
 
 **Last Updated**: 2026-01-08
