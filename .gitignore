@@ -87,9 +87,9 @@ ehthumbs.db
 Desktop.ini
 
 # Data directories (excluded from version control)
-dev/
+# dev/
 data/
-outputs/
+output/
 
 # Configuration files with credentials
 config/*.yaml
