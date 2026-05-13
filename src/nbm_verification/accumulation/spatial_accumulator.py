@@ -90,6 +90,11 @@ class GridpointAccumulator(StatisticsAccumulator):
             metrics["brier_score"] = (
                 self.probabilistic_components["brier_sum"] / self.n_samples
             )
+        if "crps_sum" in self.probabilistic_components:
+            crps_n = self.probabilistic_components["crps_n"]
+            metrics["crps"] = (
+                self.probabilistic_components["crps_sum"] / crps_n if crps_n > 0 else np.nan
+            )
 
         return metrics
 

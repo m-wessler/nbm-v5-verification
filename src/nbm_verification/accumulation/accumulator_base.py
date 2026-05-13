@@ -1,9 +1,12 @@
 """Base statistics accumulator class for verification metrics."""
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class StatisticsAccumulator(ABC):
@@ -71,6 +74,7 @@ class StatisticsAccumulator(ABC):
         forecasts: np.ndarray,
         observations: np.ndarray,
         probabilistic_forecasts: Optional[np.ndarray] = None,
+        quantile_levels: Optional[np.ndarray] = None,
     ) -> None:
         """
         Update accumulator with new forecast-observation pairs.
@@ -78,19 +82,30 @@ class StatisticsAccumulator(ABC):
         Parameters
         ----------
         forecasts : np.ndarray
-            Array of forecast values
+            Array of deterministic forecast values (shape: ``(n,)``).
         observations : np.ndarray
-            Array of observation values (same shape as forecasts)
+            Array of observation values (same shape as ``forecasts``).
         probabilistic_forecasts : np.ndarray, optional
-            Array of probabilistic forecast values (for probabilistic metrics)
+            Array of probabilistic forecast values.  Two shapes are supported:
+
+            * ``(n,)``  – pre-computed exceedance probabilities (0–1) for Brier
+              Score.
+            * ``(n, n_quantiles)`` – quantile forecast CDF for CRPS.  In this
+              case ``quantile_levels`` must also be provided.
+
+        quantile_levels : np.ndarray, optional
+            Quantile levels corresponding to the last axis of
+            ``probabilistic_forecasts`` when it is 2-D.  Values may be in
+            [0, 1] or [1, 100]; values > 1 are automatically rescaled.
 
         Notes
         -----
-        Only valid (non-NaN) pairs are accumulated. Missing data is automatically filtered.
+        Only valid (non-NaN) pairs are accumulated.  Missing data is
+        automatically filtered out before any statistic is updated.
         """
         # Ensure arrays are numpy arrays
-        forecasts = np.asarray(forecasts)
-        observations = np.asarray(observations)
+        forecasts = np.asarray(forecasts, dtype=float)
+        observations = np.asarray(observations, dtype=float)
 
         # Create mask for valid pairs (both forecast and observation are non-NaN)
         valid_mask = ~(np.isnan(forecasts) | np.isnan(observations))
@@ -100,42 +115,83 @@ class StatisticsAccumulator(ABC):
         valid_observations = observations[valid_mask]
 
         # Update sample count
-        n_valid = np.sum(valid_mask)
+        n_valid = int(np.sum(valid_mask))
         self.n_samples += n_valid
 
         if n_valid == 0:
             return  # No valid pairs to process
 
         # Update continuous statistics
-        self.sum_forecast += np.sum(valid_forecasts)
-        self.sum_obs += np.sum(valid_observations)
-        self.sum_forecast_squared += np.sum(valid_forecasts**2)
-        self.sum_obs_squared += np.sum(valid_observations**2)
+        self.sum_forecast += float(np.sum(valid_forecasts))
+        self.sum_obs += float(np.sum(valid_observations))
+        self.sum_forecast_squared += float(np.sum(valid_forecasts**2))
+        self.sum_obs_squared += float(np.sum(valid_observations**2))
 
         # Calculate errors
         errors = valid_forecasts - valid_observations
-        self.sum_abs_error += np.sum(np.abs(errors))
-        self.sum_squared_error += np.sum(errors**2)
+        self.sum_abs_error += float(np.sum(np.abs(errors)))
+        self.sum_squared_error += float(np.sum(errors**2))
 
         # Update contingency tables for categorical metrics
         for threshold in self.thresholds:
             forecast_yes = valid_forecasts >= threshold
             observed_yes = valid_observations >= threshold
 
-            self.contingency_tables[threshold]["hits"] += np.sum(forecast_yes & observed_yes)
-            self.contingency_tables[threshold]["misses"] += np.sum(~forecast_yes & observed_yes)
-            self.contingency_tables[threshold]["false_alarms"] += np.sum(
+            self.contingency_tables[threshold]["hits"] += int(np.sum(forecast_yes & observed_yes))
+            self.contingency_tables[threshold]["misses"] += int(np.sum(~forecast_yes & observed_yes))
+            self.contingency_tables[threshold]["false_alarms"] += int(np.sum(
                 forecast_yes & ~observed_yes
-            )
-            self.contingency_tables[threshold]["correct_negatives"] += np.sum(
+            ))
+            self.contingency_tables[threshold]["correct_negatives"] += int(np.sum(
                 ~forecast_yes & ~observed_yes
-            )
+            ))
 
         # Update probabilistic components if provided
         if probabilistic_forecasts is not None:
-            self._update_probabilistic(
-                probabilistic_forecasts[valid_mask], valid_observations
+            prob_arr = np.asarray(probabilistic_forecasts, dtype=float)
+            if prob_arr.ndim == 2:
+                # Quantile CDF forecasts → CRPS accumulation
+                if quantile_levels is not None:
+                    self._update_crps(
+                        prob_arr[valid_mask], quantile_levels, valid_observations
+                    )
+            else:
+                # 1-D exceedance probability → Brier Score accumulation
+                self._update_probabilistic(prob_arr[valid_mask], valid_observations)
+
+    def _update_crps(
+        self,
+        quantile_forecasts: np.ndarray,
+        quantile_levels: np.ndarray,
+        observations: np.ndarray,
+    ) -> None:
+        """
+        Accumulate CRPS components from quantile (percentile) forecast CDFs.
+
+        Parameters
+        ----------
+        quantile_forecasts : np.ndarray, shape ``(n, n_quantiles)``
+            Quantile forecast values for ``n`` valid samples.
+        quantile_levels : np.ndarray, shape ``(n_quantiles,)``
+            Quantile levels in [0, 1] or [1, 100].
+        observations : np.ndarray, shape ``(n,)``
+            Observation values for the same ``n`` valid samples.
+        """
+        from nbm_verification.metrics.probabilistic import compute_crps_from_quantiles
+
+        crps_vals = compute_crps_from_quantiles(quantile_forecasts, quantile_levels, observations)
+        valid = ~np.isnan(crps_vals)
+
+        if "crps_sum" not in self.probabilistic_components:
+            self.probabilistic_components["crps_sum"] = 0.0
+            self.probabilistic_components["crps_n"] = 0
+            # Store quantile levels so merge can validate compatibility
+            self.probabilistic_components["quantile_levels"] = np.asarray(
+                quantile_levels, dtype=float
             )
+
+        self.probabilistic_components["crps_sum"] += float(np.sum(crps_vals[valid]))
+        self.probabilistic_components["crps_n"] += int(np.sum(valid))
 
     def _update_probabilistic(
         self, prob_forecasts: np.ndarray, observations: np.ndarray
@@ -204,6 +260,30 @@ class StatisticsAccumulator(ABC):
             self.probabilistic_components["brier_sum"] += other.probabilistic_components[
                 "brier_sum"
             ]
+
+        if "crps_sum" in other.probabilistic_components:
+            if "crps_sum" not in self.probabilistic_components:
+                self.probabilistic_components["crps_sum"] = 0.0
+                self.probabilistic_components["crps_n"] = 0
+
+            # Warn if the quantile levels used to compute CRPS differ between
+            # the two accumulators.  Merging CRPS values built from different
+            # quantile sets is not statistically meaningful.
+            self_levels = self.probabilistic_components.get("quantile_levels")
+            other_levels = other.probabilistic_components.get("quantile_levels")
+            if self_levels is not None and other_levels is not None:
+                if not np.array_equal(
+                    np.sort(self_levels), np.sort(np.asarray(other_levels, dtype=float))
+                ):
+                    logger.warning(
+                        "Merging CRPS accumulators with different quantile levels "
+                        "(%s vs %s). The merged CRPS will not be meaningful.",
+                        self_levels.tolist(),
+                        np.asarray(other_levels).tolist(),
+                    )
+
+            self.probabilistic_components["crps_sum"] += other.probabilistic_components["crps_sum"]
+            self.probabilistic_components["crps_n"] += other.probabilistic_components["crps_n"]
 
     @abstractmethod
     def compute_metrics(self) -> Dict[str, Any]:
