@@ -87,9 +87,17 @@ ehthumbs.db
 Desktop.ini
 
 # Data directories (excluded from version control)
-# dev/
 data/
 output/
+
+# Geospatial / reference data files
+shapefiles/
+*.geojson
+*.json
+*.dbf
+*.prj
+*.shp
+*.shx
 
 # Configuration files with credentials
 config/*.yaml

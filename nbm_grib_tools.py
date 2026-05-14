@@ -162,7 +162,9 @@ def _parse_local_text_full(text):
     """Parses hidden Section 2 ASCII text (e.g., 'RH_le_35_WSPD_ge_10')."""
     if not text: return None, []
     ops = {'le': '<=', 'lt': '<', 'ge': '>=', 'gt': '>', 'eq': '=', 'ne': '!='}
-    pattern = re.compile(r"([A-Za-z0-9]+)_(le|lt|ge|gt|eq|ne)_([0-9\.]+)")
+    # Accept either underscore or colon separators, e.g.
+    # RH_le_35_WSPD_ge_10 or RH:le:35:WSPD:ge:10
+    pattern = re.compile(r"([A-Za-z0-9]+)(?:_|:)(le|lt|ge|gt|eq|ne)(?:_|:)([0-9\.]+)")
     matches = pattern.findall(text)
     if not matches: return text, []
     
