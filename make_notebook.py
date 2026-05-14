@@ -443,7 +443,7 @@ cells = [
 
 nb.cells = cells
 
-out = Path(r'C:\Users\Michael.wessler\Code\nbm-v5-verification\dev\nbm_verification.ipynb')
+out = Path(r'C:\Users\Michael.wessler\Code\nbm-v5-verification\nbm_verification.ipynb')
 with open(out, 'w', encoding='utf-8') as f:
     nbf.write(nb, f)
 
